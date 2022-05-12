@@ -5,10 +5,6 @@ using namespace std;
 - 入力
 辞書ファイル -> dic.txt
 単語 -> input.txt
-
-なぜか"z"という文字列が入力されると以下のエラーが出ます。
-terminate called after throwing an instance of 'std::out_of_range'
-  what():  vector::_M_range_check: __n (which is 84093) >= this->size() (which is 84093)
 */
 
 int anagram1(string random_word, vector<pair<string,string>> dic){
