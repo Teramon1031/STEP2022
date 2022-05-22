@@ -1,0 +1,177 @@
+/*
+week3-homework1
++, -, *, / が入った計算式を正しい順番で実行する。
+e.g. 3.5 + 3 * 2 / 6  ->  3.5 + 6 / 6  ->  3.5 + 1 -> 4.5
+*/
+
+
+#include <bits/stdc++.h>
+using namespace std;
+
+// string と double の行き来をなくし、ひとつの vector で管理するために、記号にdouble型の数字を割り当てる。
+const double plusSign  = 1000003;
+const double minusSign = 1000033;
+const double multiSign = 1000037;
+const double divSign   = 1000039;
+
+
+double makeDoubleNumber(string token){
+    double number = 0;
+    int index = 0;
+    // 小数点が来ない限り、`number` を10倍して次の値を足すことを繰り返す
+    while(index < token.size() && token.at(index)!='.'){
+        number = number * 10 + (token.at(index) - '0');
+        index++; //次の桁へ
+    }
+   
+    if(index < token.size() && token.at(index)=='.'){
+        index++; // 小数第一位へ移動
+        double decimal_digit = 1;
+        while(index < token.size()){
+            decimal_digit /= 10;
+            number = number + (token.at(index)-'0') * decimal_digit;
+            index++;
+        }
+    }
+    return number;
+}
+
+double doublize(string token){
+    //tokenをstringからdouble型に変換する
+    if(token.at(0)=='+'){
+        return plusSign;
+    }
+    if(token.at(0)=='-'){
+        return minusSign;
+    }
+    if(token.at(0)=='*'){
+        return multiSign;
+    }
+    if(token.at(0)=='/'){
+        return divSign;
+    }
+
+    // 記号じゃなければ数字にして返す
+    return makeDoubleNumber(token);
+}
+
+vector<string> input_lines(){
+    vector<string> input_lines(0);
+    string line;
+    while(getline(cin, line)){
+        input_lines.push_back(line);
+    }
+    return input_lines;
+}
+
+vector<double> input_token(string line){
+    // 1-1. 空白で区切られた単語をstring型の配列に格納する。
+    // 1-2. 2-2のコードが簡単になるので+を最初につけておく
+    vector<string> str_tokens={"+"};
+    istringstream iss(line);
+    string token; 
+    while(iss >> token){
+        str_tokens.push_back(token);
+    }
+
+    // double型の配列に変換
+    vector<double> double_tokens(str_tokens.size());
+    for(int i=0; i < double_tokens.size(); i++){
+        double_tokens.at(i) = doublize(str_tokens.at(i));
+    }
+    return double_tokens;
+}
+
+vector<double> stack_to_vector(stack<double> original_stack){
+    vector<double> aimed_vector(0);
+    while(!original_stack.empty()){
+        aimed_vector.push_back(original_stack.top());
+        original_stack.pop();
+    }
+    reverse(aimed_vector.begin(), aimed_vector.end());
+    return aimed_vector;
+}
+
+vector<double> evaluate_MultiAndDiv(vector<double> tokens){
+    // 2-1-1. `tokens` を前から順に見ていき、*と/のみ計算する。
+    //        e.g.  {1 + 3 / 2} -> {1 + 1.5} 
+    
+    stack<double> no_MultiAndDiv_tokens;
+    for(int i=0; i<tokens.size(); i++){
+        // cout << "i:" << i << ", tokens.at(i)" << tokens.at(i) << endl;
+        // 2-1-2. *, / がきたら、直後のtokenと `no_MultiAndDiv_tokens.top()` を掛け算or割り算。
+        //        計算結果と `no_MultiAndDiv_tokens` のtopの値を入れ替え
+        if(tokens.at(i) == multiSign){
+            double prev = no_MultiAndDiv_tokens.top();
+            double next = tokens.at(i+1);
+            no_MultiAndDiv_tokens.pop();
+            no_MultiAndDiv_tokens.push(prev * next);
+            i++;
+        }
+        else if(tokens.at(i) == divSign){
+            double prev = no_MultiAndDiv_tokens.top();
+            double next = tokens.at(i+1);
+            no_MultiAndDiv_tokens.pop();
+            no_MultiAndDiv_tokens.push(prev / next);
+            i++;
+        }
+
+        // 2-1-3. 数字, +, - が来たらそのまま stack `no_MultiAndDiv_tokens` にpush
+        else if(tokens.at(i) == plusSign){
+            no_MultiAndDiv_tokens.push(plusSign);
+        }
+        else if(tokens.at(i) == minusSign){
+            no_MultiAndDiv_tokens.push(minusSign);
+        }
+        else{
+            no_MultiAndDiv_tokens.push(tokens.at(i));
+        }
+    }
+    return stack_to_vector(no_MultiAndDiv_tokens);
+}
+
+double evaluate_PlusAndMinus(vector<double> tokens){
+    double answer=0;
+    // 2-2-1.例外を考えなければ、+と-の時だけ`ans`に直後の値をたし引きすれば良い。
+    for(int i=0; i<tokens.size(); i++){
+        if(tokens.at(i) == plusSign){
+            answer += tokens.at(i+1);
+        }
+        else if(tokens.at(i) == minusSign){
+            answer -= tokens.at(i+1);
+        }
+    }
+    return answer;
+}
+
+double evaluate(vector<double> tokens){
+    // 2-1. tokens に含まれる * と / を先に実行し、数字, + , - のみのtokensを新しく作る。
+    vector<double> multiplied_tokens = evaluate_MultiAndDiv(tokens);
+    //↓debug用↓
+        // for(int i=0; i<multiplied_tokens.size(); i++){
+        //     cout << multiplied_tokens.at(i) << ' ';
+        // }
+        // cout << endl;
+    // 2-2. +,-の計算を実行して返す
+    return evaluate_PlusAndMinus(multiplied_tokens);
+}
+
+
+int main (){
+    // 0. 一行ごとに読み込む。
+    vector<string> lines = input_lines();
+    for(int i=0; i<lines.size(); i++){
+
+        // 1. 空白で区切られた単語をそれぞれdouble型のtokenとして `tokens` に格納 
+        // `tokens` は先頭に `plusSign` を入れてある
+        vector<double> tokens = input_token(lines.at(i));
+            //↓debug用↓
+            // cout << "1.done" << endl;
+
+        // 2. 計算を実行
+        double answer = evaluate(tokens);
+
+        // 3. output
+        cout << answer << endl;
+    }
+}
