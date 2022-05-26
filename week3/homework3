@@ -1,0 +1,249 @@
+/*
+week3-homework3
+Perform formulas with symbols, +, -, *, /, (,and ) in the correct order.
+e.g. 3.5 + 3 * ( 6 - 2 )  ->  3.5 + 3 * 4  ->  3.5 + 12 -> 15.5
+
+process:
+1. store all tokens per line in a vector, `tokens`.
+2. insert symbols and make data as follows:
+    {lparenSymbol, <input data> , rparenSymbol}.
+3. Calculate TOKENS starting from the innermost paren.
+    3-1. insert the result in the token, where the left paren was.
+    3-2. insert skipSymbols in the token, where the other elements of the most inner parens were.
+    recurse 3 by all parens are eliminated
+4. output
+*/
+
+#include <bits/stdc++.h>
+using namespace std;
+
+// to avoid extra conversion between string and double, assign double type numbers to the symbols 
+const double plusSymbol  = 1000003;
+const double minusSymbol = 1000033;
+const double multiSymbol = 1000037;
+const double divSymbol   = 1000039;
+const double lparenSymbol = 1000081;
+const double rparenSymbol = 1000099;
+const double skipSymbol = 1000117;
+
+
+double makeDoubleNumber(string token){
+    double number = 0;
+    int index = 0;
+    // 小数点が来ない限り、`number` を10倍して次の値を足すことを繰り返す
+    while(index < token.size() && token.at(index)!='.'){
+        number = number * 10 + (token.at(index) - '0');
+        index++; //次の桁へ
+    }
+   
+    if(index < token.size() && token.at(index)=='.'){
+        index++; // 小数第一位へ移動
+        double decimal_digit = 1;
+        while(index < token.size()){
+            decimal_digit /= 10;
+            number = number + (token.at(index)-'0') * decimal_digit;
+            index++;
+        }
+    }
+    return number;
+}
+
+double doublize(string token){
+    //tokenをstringからdouble型に変換する
+    if(token.at(0)=='+'){
+        return plusSymbol;
+    }
+    if(token.at(0)=='-'){
+        return minusSymbol;
+    }
+    if(token.at(0)=='*'){
+        return multiSymbol;
+    }
+    if(token.at(0)=='/'){
+        return divSymbol;
+    }
+    if(token.at(0)=='('){
+        return lparenSymbol;
+    }
+    if(token.at(0)==')'){
+        return rparenSymbol;
+    }
+
+    // 記号じゃなければ数字にして返す
+    return makeDoubleNumber(token);
+}
+
+vector<string> input_lines(){
+    vector<string> input_lines(0);
+    string line;
+    while(getline(cin, line)){
+        input_lines.push_back(line);
+    }
+    return input_lines;
+}
+
+vector<double> input_token(string line){
+    // 1-1. store each space-separeted word in `line` to str_tokens 
+    // 1-2. to simplify the recursion in step3, add "(" and ")" to the first and last
+    vector<string> str_tokens={"("};
+    istringstream iss(line);
+    string token; 
+    while(iss >> token){
+        str_tokens.push_back(token);
+    }
+    str_tokens.push_back(")");
+
+    // convert to a vector<double>
+    vector<double> double_tokens(str_tokens.size());
+    for(int i=0; i < double_tokens.size(); i++){
+        double_tokens.at(i) = doublize(str_tokens.at(i));
+    }
+    return double_tokens;
+}
+
+vector<double> stack_to_vector(stack<double> original_stack){
+    // convert stack to vector by popping all the items and reverse the order
+    vector<double> aimed_vector(0);
+    while(!original_stack.empty()){
+        aimed_vector.push_back(original_stack.top());
+        original_stack.pop();
+    }
+    reverse(aimed_vector.begin(), aimed_vector.end());
+    return aimed_vector;
+}
+
+double next_token(vector<double> &tokens, int &index){
+    // Check the next token skipping skipSymbols and match the index to it.
+    index++;
+    while(tokens.at(index)==skipSymbol){
+        index++;
+    }
+    return tokens.at(index);
+}
+
+vector<double> evaluate_MultiAndDiv(vector<double> &tokens){
+    // examine the `tokens` from the beginning and calculate only * and /.
+    //        e.g.  {1 + 3 / 2} -> {1 + 1.5} 
+    
+    stack<double> no_MultiAndDiv_tokens;
+    for(int i=0; i<tokens.size(); i++){
+        // If * or / comes, multiply or divide `no_MultiAndDiv_tokens.top()` by the next token.
+        //        exchange the result and `no_MultiAndDiv_tokens.top()`
+        if(tokens.at(i) == multiSymbol){
+            double prev = no_MultiAndDiv_tokens.top();
+            double next = next_token(tokens,i);
+            no_MultiAndDiv_tokens.pop();
+            no_MultiAndDiv_tokens.push(prev * next);
+            
+        }
+        else if(tokens.at(i) == divSymbol){
+            double prev = no_MultiAndDiv_tokens.top();
+            double next = next_token(tokens,i);
+            no_MultiAndDiv_tokens.pop();
+            no_MultiAndDiv_tokens.push(prev / next);
+            
+        }
+
+        // If numbers, +, or - comes, push it to the stack `no_MultiAndDiv_tokens`
+        else if(tokens.at(i) == plusSymbol){
+            no_MultiAndDiv_tokens.push(plusSymbol);
+        }
+        else if(tokens.at(i) == minusSymbol){
+            no_MultiAndDiv_tokens.push(minusSymbol);
+        }
+        else if(tokens.at(i) == skipSymbol){
+            continue;
+        }
+        else{
+            no_MultiAndDiv_tokens.push(tokens.at(i));
+        }
+    }
+    return stack_to_vector(no_MultiAndDiv_tokens);
+}
+
+double evaluate_PlusAndMinus(vector<double> &tokens){
+    double answer=0;
+    for(int i=0; i<tokens.size(); i++){
+        if(tokens.at(i) == plusSymbol){
+            answer += next_token(tokens,i);
+        }
+        else if(tokens.at(i) == minusSymbol){
+            answer -= next_token(tokens,i);
+        }
+    }
+    return answer;
+}
+
+double evaluate_without_paren (vector<double> &tokens){
+    // Execute the * and / contained in tokens first, and create a new tokens with only numbers, + ,and -.
+    vector<double> multiplied_tokens = evaluate_MultiAndDiv(tokens);
+    return evaluate_PlusAndMinus(multiplied_tokens);
+}
+
+vector<double> extract_minimum_paren(vector<double> &tokens, int &minimum_lparen_index, int &minimum_rparen_index){
+    // return a vector which has the tokens of innermost 
+    vector<double> minimum_paren={plusSymbol}; 
+    int index = 0;
+    while(index < tokens.size() && tokens.at(index)!=rparenSymbol){
+        if(tokens.at(index)==lparenSymbol){
+            // initialize `minimum_paren` when the inner most paren is renewed
+            minimum_paren={plusSymbol};
+            // record the index of the left paren
+            minimum_lparen_index = index;
+        }else{
+            minimum_paren.push_back(tokens.at(index));
+        }
+        index++;
+    }
+    if(index==tokens.size()){
+        minimum_rparen_index=index-1;
+    }else{
+        minimum_rparen_index=index;
+    }
+ 
+    return minimum_paren;
+}
+
+double evaluate (vector<double> tokens){
+    // 3-1. get a vector `minimum_paren_tokens` which has tokens of the innermost parentheses.
+    int lparen_index=0;
+    int rparen_index=0;
+    vector<double> minimum_paren_tokens = extract_minimum_paren(tokens,lparen_index,rparen_index);
+
+     // 3-2. execute evaluate_without_paren(minimum_paren_tokens);
+    if(lparen_index==0){
+        // // terminate the recursion.
+        return evaluate_without_paren(minimum_paren_tokens);
+    }
+
+    // 3-3. insert the result in the `tokens`, where the left paren was.
+    // 3-4. insert skipSymbols in the `tokens`, where right paren was and where the other contents of the innermost parentheses were.
+    //      by 3-3 and 3-4, the innermost parens were eliminated from `tokens`.
+    double paren_result = evaluate_without_paren(minimum_paren_tokens);
+    tokens.at(lparen_index) = paren_result;
+    for(int i=lparen_index+1; i<=rparen_index; i++){
+        tokens.at(i) = skipSymbol;
+    }
+    // 3-5. recurse evaluate(tokens);
+    //      if `lparen_index`== 0, terminate the recursion.
+    return evaluate(tokens);
+}
+
+
+int main (){
+    // 0. read input by lines.
+    vector<string> lines = input_lines();
+    for(int i=0; i<lines.size(); i++){
+
+        // 1. store all tokens per line in a vector `tokens`.
+        // 2. insert symbols and make data as follows:
+        //      {lparenSymbol, <input data> , rparenSymbol}.
+        vector<double> tokens = input_token(lines.at(i));
+
+        // 3. perform the calculations
+        double answer = evaluate(tokens);
+
+        // 4. output
+        cout << answer << endl;
+    }
+}
